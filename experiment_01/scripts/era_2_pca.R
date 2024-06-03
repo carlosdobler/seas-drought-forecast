@@ -151,18 +151,21 @@ for (i in seq(nrow(tb_extents))) {
   
   # 3-month rolling mean
   
-  s_3mon <- 
-    s %>% 
-    st_apply(c(1,2), function(x) {
-      
-      zoo::rollmean(x, k = 3, align = "right", na.pad = T)
-      
-    },
-    .fname = "time",
-    FUTURE = T) %>% 
-    aperm(c(2,3,1))
+  # NO NEED FOR THIS
+  # MESSES UP TIMES
   
-  st_dimensions(s_3mon) <- st_dimensions(s)
+  # s_3mon <- 
+  #   s %>% 
+  #   st_apply(c(1,2), function(x) {
+  #     
+  #     zoo::rollmean(x, k = 3, align = "right", na.pad = T)
+  #     
+  #   },
+  #   .fname = "time",
+  #   FUTURE = T) %>% 
+  #   aperm(c(2,3,1))
+  # 
+  # st_dimensions(s_3mon) <- st_dimensions(s)
   
   
   # no de-trending necessary (no significant trend identified)
@@ -176,7 +179,8 @@ for (i in seq(nrow(tb_extents))) {
   
   # anomalies (by calendar month)
   s_anom <- 
-    s_3mon %>% 
+    # s_3mon %>%
+    s %>% 
     st_apply(c(1,2), function(x) {
       
       if(all(is.na(x))) {
@@ -224,6 +228,7 @@ for (i in seq(nrow(tb_extents))) {
     select(time, v, gcell) %>% 
     pivot_wider(names_from = "gcell", names_prefix = "g_", values_from = v)
   
+  
   pca <- 
     tb_for_pca %>% 
     select(-1) %>% 
@@ -241,7 +246,7 @@ for (i in seq(nrow(tb_extents))) {
   
   
   # # plot (spatial)
-  # pca$rotation[,"PC2"] %>%
+  # pca$rotation[,"PC1"] %>%
   #   as_tibble() %>%
   #   bind_cols(
   #     s_anom %>%
@@ -260,7 +265,8 @@ for (i in seq(nrow(tb_extents))) {
   # pca$x[, "PC1"] %>%
   #   as_tibble() %>%
   #   mutate(time =
-  #            tail(st_get_dimension_values(s, 3), -2) %>%
+  #            # tail(st_get_dimension_values(s, 3), -2) %>%
+  #            st_get_dimension_values(s, 3) %>% 
   #            as_date()) %>%
   #   ggplot(aes(time, value)) +
   #   geom_line() +
