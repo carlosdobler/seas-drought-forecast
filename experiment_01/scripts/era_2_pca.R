@@ -3,9 +3,10 @@ library(tidyverse)
 library(stars)
 library(furrr)
 
-plan(multisession)
+options(future.fork.enable = T)
+plan(multicore)
 
-dir_data <- "/mnt/pers_disk/data"
+dir_data <- "/mnt/pers_disk_/data"
 
 source("https://raw.github.com/carlosdobler/spatial-routines/master/cell_pos_and_import_subset.R")
 
@@ -34,19 +35,19 @@ tb_extents <-
 # DOWNLOAD TO LOCAL DISK ----
 
 # fs::dir_create(dir_data)
-
-# tb_extents %>% 
-#   pull(var) %>% 
-#   unique() %>%
+# 
+# tb_extents %>%
+#   pull(var) %>%
+#   unique() %>% 
 #   walk(function(v) {
-#     
-#     d <- 
+# 
+#     d <-
 #       "gsutil ls gs://clim_data_reg_useast1/era/monthly" %>%
-#       system(intern = T) %>% 
+#       system(intern = T) %>%
 #       str_subset(v)
-#       
+# 
 #     "gsutil -m cp {d}* {dir_data}" %>%
-#       str_glue() %>% 
+#       str_glue() %>%
 #       system()
 # 
 #   })
@@ -187,9 +188,21 @@ for (i in seq(nrow(tb_extents))) {
         rep(NA, length(x))
       } else {
         
-        m <- matrix(x, ncol = 12, byrow = T)
-        mm <- apply(m, 2, mean, na.rm = T)
-        as.vector(t(x-mm))
+        xx <- 
+          x %>% 
+          # units::drop_units() %>% 
+          zoo::rollmean(3, fill = NA, align = "right") 
+        
+        mm <- 
+          xx %>% 
+          matrix(ncol = 12, byrow = T) %>% 
+          apply(2, mean, na.rm = T)
+        
+        xx-mm
+        
+        # m <- matrix(x, ncol = 12, byrow = T)
+        # mm <- apply(m, 2, mean, na.rm = T)
+        # as.vector(t(x-mm))
         
       }
       
@@ -233,11 +246,16 @@ for (i in seq(nrow(tb_extents))) {
     tb_for_pca %>% 
     select(-1) %>% 
     
-    apply(1, scale, scale = F) %>%
+    apply(1, scale, scale = F) %>% # scaled divides by sd
     aperm(c(2,1)) %>%
     
-    prcomp(scale. = T, # T
-           center = F) # virtually no diff
+    # substracting them mean (as below) is exactly the same
+    # as applying the scaling step above:
+    # mutate(m = rowMeans(pick(everything())),
+    #        across(-m, \(x) x - m)) %>%
+    # select(-m) %>% 
+  
+    prcomp(scale. = F)
   
   
   # # % var explained
@@ -246,7 +264,7 @@ for (i in seq(nrow(tb_extents))) {
   
   
   # # plot (spatial)
-  # pca$rotation[,"PC1"] %>%
+  # pca$rotation[,"PC2"] %>%
   #   as_tibble() %>%
   #   bind_cols(
   #     s_anom %>%
@@ -259,14 +277,14 @@ for (i in seq(nrow(tb_extents))) {
   #   geom_raster() +
   #   scale_fill_gradient2() +
   #   coord_equal()
-  # 
-  # 
+
+
   # # plot (temporal)
-  # pca$x[, "PC1"] %>%
+  # pca$x[, "PC2"] %>%
   #   as_tibble() %>%
   #   mutate(time =
-  #            # tail(st_get_dimension_values(s, 3), -2) %>%
-  #            st_get_dimension_values(s, 3) %>% 
+  #            tail(st_get_dimension_values(s, 3), -2) %>%
+  #            # st_get_dimension_values(s, 3) %>%
   #            as_date()) %>%
   #   ggplot(aes(time, value)) +
   #   geom_line() +
@@ -279,16 +297,45 @@ for (i in seq(nrow(tb_extents))) {
   #   geom_hline(yintercept = 0, linetype = "2222")
   
   
-  
   # # test prediction
-  # tb_for_pca %>% 
-  #   slice(1) %>% 
-  #   select(-1) %>% 
+  # tb_for_pca %>%
+  #   slice(1) %>%
+  #   select(-1) %>%
   #   apply(1, scale, scale = F) %>%
-  #   aperm(c(2,1)) %>% 
+  #   aperm(c(2,1)) %>%
   #   {predict(pca, .)} %>% .[,"PC1"]
   # 
   # pca$x[1,"PC1"]
+  
+  
+  # # reconstruction with 5 components
+  # mu = tb_for_pca %>% select(-1) %>% colMeans()
+  # nComp = 5
+  # Xhat = pca$x[,1:nComp] %*% t(pca$rotation[,1:nComp])
+  # Xhat = scale(Xhat, center = -mu, scale = FALSE)
+  # 
+  # tb_for_pca %>% select(1) %>% 
+  #   bind_cols(as_tibble(Xhat)) %>% 
+  #   pivot_longer(-time) %>% 
+  #   select(value) %>% 
+  #   bind_cols(tb_anom) %>% 
+  #   
+  #   filter(time == "2000_01") %>% 
+  #   
+  #   ggplot(aes(longitude, latitude, fill = value)) +
+  #   geom_raster() +
+  #   colorspace::scale_fill_continuous_diverging() +
+  #   coord_equal()
+  # 
+  # tb_anom %>% 
+  #   filter(time == "2000_01") %>% 
+  #   
+  #   ggplot(aes(longitude, latitude, fill = v)) +
+  #   geom_raster() +
+  #   colorspace::scale_fill_continuous_diverging() +
+  #   coord_equal()
+    
+  
   
   
   

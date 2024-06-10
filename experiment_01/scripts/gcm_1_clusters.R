@@ -1,4 +1,8 @@
 
+# Cluster analysis of rainfall anomalies in the DRC.
+# Resulting clusters will represent the response variable
+# in a classification task model.
+
 
 library(tidyverse)
 library(stars)
@@ -34,7 +38,6 @@ dsn <-
   str_glue('{root_dsn}:{var}.zarr/')
 
 ret = gdal_utils("mdiminfo", dsn, quiet = TRUE)
-# jsonlite::fromJSON(ret)$dimensions
 time_array <- jsonlite::fromJSON(ret)$arrays$time
 
 time_vector <- 
@@ -67,14 +70,13 @@ gcm_proxy_ext <-
             count = c(count_x, count_y, 1)) %>% 
   adrop()
 
-
 new_grid <- 
-  st_as_stars(st_bbox(gcm_proxy_ext), dx = 1.25, values = NA)
+  st_as_stars(st_bbox(gcm_proxy_ext), dx = 1.4, values = NA_real_, inside = T)
 
 land_r <- 
   land %>% 
-  st_rasterize(new_grid, align = T) %>% 
-  st_warp(new_grid)
+  st_rasterize(new_grid) #%>% 
+  # st_warp(new_grid)
 
 
 
@@ -98,6 +100,7 @@ s_all_mem <-
       read_mdim(dsn, 
                 offset = c(off_x, off_y, time_i-1), 
                 count = c(count_x, count_y, NA))
+      
     
     # regularize dimensions
     pr_gcm <- 
@@ -105,7 +108,8 @@ s_all_mem <-
       st_set_dimensions(2, values = seq(st_bbox(pr_gcm)[2],
                                         st_bbox(pr_gcm)[4],
                                         length.out = dim(pr_gcm)[2])) %>%
-      st_set_crs(4326)
+      st_set_crs(4326) %>% 
+      st_warp(new_grid)
     
     # change units
     pr_gcm <- 
@@ -115,24 +119,9 @@ s_all_mem <-
                units::set_units(kg/m^2/d) %>% 
                units::set_units(NULL))
     
-    # subset SON and aggregate
-    pr_gcm <- 
-      pr_gcm %>% 
-      filter(month(time) %in% c(9,10,11)) %>% 
-      aggregate(by = "1 year", sum) %>% 
-      aperm(c(2,3,1))
     
     
-    # regrid
-    pr_gcm <- 
-      pr_gcm %>%
-      st_warp(new_grid,
-              use_gdal = T, 
-              method = "cubic") %>%
-      setNames("pr") %>% 
-      st_set_dimensions(which = c(1,2,3), names = c("lon", "lat", "time")) %>% 
-      st_set_dimensions(3, values = seq(year(time_vector[time_i]), last(year(time_vector))))
-    
+    # apply land mask
     pr_gcm[is.na(land_r)] <- NA
     
     return(pr_gcm)
@@ -140,44 +129,9 @@ s_all_mem <-
   })
 
 
-# de-trend ?
 
-# s_all_mem[[2]] %>%
-#   pull() %>%
-#   .[20,20,] %>%
-#   plot(type = "l")
-
-
-# s_all_mem_detrended <- 
-#   s_all_mem %>% 
-#   map(function(s) {
-#     
-#     r <- 
-#       s %>% 
-#       st_apply(c(1,2), function(x) {
-#         
-#         if(any(is.na(x))){
-#           rep(NA, length(x))
-#         } else {
-#           
-#           m <- lm(x ~ seq(x))
-#           trend <- coef(m)[2] * seq(x) + coef(m)[1]
-#           x - trend
-#           
-#         }
-#         
-#       },
-#       .fname = "time") %>% 
-#       aperm(c(2,3,1))
-#     
-#     st_dimensions(r) <- st_dimensions(s)
-#     return(r)
-#   })
-
-
-# normalize
-s_all_mem_norm <- 
-  # s_all_mem_detrended %>%
+# rolling window
+s_all_mem_seas <- 
   s_all_mem %>% 
   map(function(s) {
     
@@ -189,7 +143,7 @@ s_all_mem_norm <-
           rep(NA, length(x))
         } else {
           
-          ecdf(x)(x)
+          zoo::rollmean(x, 3, align = "right", fill = NA)
           
         }
         
@@ -204,25 +158,208 @@ s_all_mem_norm <-
 
 
 
-# tb for clustering
+
+# APPROACH 1: NORMALIZE EACH MEMBER ON ITS OWN
+{ 
+# # normalize
+# s_all_mem_norm <- 
+#   s_all_mem_seas %>% 
+#   map(function(s) {
+#     
+#     r <- 
+#       s %>% 
+#       st_apply(c(1,2), function(x) {
+#         
+#         if(all(is.na(x))){
+#           rep(NA, length(x))
+#         } else {
+#           
+#           x %>% 
+#             matrix(ncol = 12, byrow = T) %>% 
+#             apply(2, function(xx) {
+#               ecdf(xx)(xx)
+#             }) %>% 
+#             t() %>% 
+#             as.vector()
+#           
+#           
+#           # x_mean <- 
+#           #   x %>% 
+#           #   matrix(ncol = 12, byrow = T) %>% 
+#           #   apply(2, mean, na.rm = T)
+#           # 
+#           # x_sd <- 
+#           #   x %>% 
+#           #   matrix(ncol = 12, byrow = T) %>% 
+#           #   apply(2, sd, na.rm = T)
+#           # 
+#           # (x-x_mean)/x_sd
+#           
+#           
+#         }
+#         
+#       },
+#       .fname = "time") %>% 
+#       aperm(c(2,3,1))
+#     
+#     st_dimensions(r) <- st_dimensions(s)
+#     return(r)
+#   })
+# 
+# 
+# # tb for clustering
+# tb <-
+#   s_all_mem_norm %>%
+#   imap_dfr(function(s, i) {
+# 
+#     s %>%
+#       as_tibble() %>%
+#       group_by(time) %>%
+#       mutate(time = as_date(time),
+#              r = row_number()) %>%
+#       ungroup() %>%
+#       mutate(mem = i) %>% 
+#       drop_na()
+# 
+#   }) %>% 
+#   mutate(time = paste0(mem, "_", time)) %>% 
+#   select(-mem)
+# 
+# tb_for_clustering <-
+#   tb %>%
+#   select(-x, -y) %>%
+#   pivot_wider(names_from = r,
+#               names_prefix = "g_",
+#               values_from = "pr")
+# 
+# 
+# set.seed(1)
+# km <-
+#   tb_for_clustering %>%
+#   select(-time) %>%
+#   kmeans(4, iter.max = 50)
+# 
+# # plot
+# tb_for_clustering %>% 
+#   select(time) %>%
+#   
+#   mutate(clus = km$cluster) %>% 
+#   right_join(tb, by = "time") %>% 
+#   
+#   group_by(clus, x, y) %>% 
+#   summarise(pr = mean(pr)) %>% 
+#   
+#   ggplot(aes(x, y, fill = pr)) +
+#   geom_raster() +
+#   coord_equal() +
+#   colorspace::scale_fill_continuous_divergingx(mid = 0.5,
+#                                                rev = T,
+#                                                #limits = c(-1,1), oob = scales::squish
+#   ) +
+#   facet_wrap(~clus)
+# 
+# km$cluster %>% table()
+# 
+# # save results
+# tibble(
+#   tb_for_clustering %>%
+#     select(1:2) %>%
+#     mutate(time =
+#              str_glue("{time}-01-01") %>%
+#              as_date() %>%
+#              {. + months(10)}),
+# 
+#   clus = km$cluster
+# 
+# ) %>%
+#   write_csv("gcm_clusters_4.csv")
+# 
+# 
+# predict.kmeans <-
+#   function(x, newdata) {
+#     a <- apply(newdata, 1, function(r) which.min(colSums((t(x$centers) - r)^2)))
+#     return(a)
+#   }
+# 
+# predict.kmeans(km,
+#                tb_for_clustering %>%
+#                  filter(time == 1850,
+#                         mem == "r1i1p1f2") %>%
+#                  select(-time, -mem))
+
+}
+
+
+
+# APPROACH TWO: NORMALIZE ALL MEMBERS TOGETHER
+
+s_all_mem_norm <- 
+  s_all_mem_seas %>% 
+  {do.call(c, c(., along = "time"))} %>% 
+  st_apply(c(1,2), function(x) {
+    
+    if(all(is.na(x))){
+      rep(NA, length(x))
+    } else {
+      
+      # quantiles
+      x %>%
+        matrix(ncol = 12, byrow = T) %>%
+        apply(2, function(xx) {
+          ecdf(xx)(xx)
+        }) %>%
+        t() %>%
+        as.vector()
+      
+      
+      # # standarize mean
+      # xx <- 
+      #   x %>%
+      #   matrix(ncol = 12, byrow = T)
+      # 
+      # x_mean <-
+      #   xx %>%
+      #   apply(2, mean, na.rm = T)
+      # 
+      # x_sd <-
+      #   xx %>%
+      #   apply(2, sd, na.rm = T)
+      # 
+      # (x-x_mean)/x_sd
+      
+    }
+    
+  },
+  .fname = "time") %>% 
+  aperm(c(2,3,1))    
+
+
+tm_vector <- 
+  
+  tidyr::expand_grid(
+    mem = 
+      mems,
+    time = s_all_mem[[1]] %>% st_get_dimension_values(3) %>% as_date()
+  ) %>% 
+  
+  mutate(tm = str_glue("{mem}_{time}")) %>% 
+  pull(tm)
+
+
 tb <- 
   s_all_mem_norm %>% 
-  imap_dfr(function(s, i) {
-    
-    s %>% 
-      as_tibble() %>% 
-      group_by(time) %>% 
-      mutate(r = row_number()) %>% 
-      ungroup() %>% 
-      mutate(mem = i) %>% 
-      na.omit()
-    
-  })
-
+  st_set_dimensions(3, values = tm_vector) %>% 
+  as_tibble() %>% 
+  group_by(time) %>% 
+  mutate(r = row_number()) %>% 
+  ungroup() 
+  
 
 tb_for_clustering <- 
-  tb %>%
-  select(-lon, -lat) %>% 
+  tb %>% 
+  drop_na() %>% 
+  select(-x,-y) %>% 
+  
   pivot_wider(names_from = r, 
               names_prefix = "g_",
               values_from = "pr")
@@ -231,120 +368,135 @@ tb_for_clustering <-
 set.seed(1)
 km <- 
   tb_for_clustering %>%
-  select(-time, -mem) %>% 
+  select(-time) %>% 
   kmeans(4, iter.max = 50)
-
-# plot
-tb_for_clustering %>% 
-  select(time, mem) %>% 
-  mutate(clus = km$cluster) %>% 
-  right_join(tb, by = c("time", "mem")) %>% 
-  
-  group_by(clus, lon, lat) %>% 
-  summarise(pr = mean(pr)) %>% 
-  
-  ggplot(aes(lon, lat, fill = pr)) +
-  geom_raster() +
-  coord_equal() +
-  colorspace::scale_fill_continuous_divergingx(mid = 0.5,
-                                               rev = T,
-                                               #limits = c(-1,1), oob = scales::squish
-  ) +
-  facet_wrap(~clus)
 
 km$cluster %>% table()
 
+res <- 
+  tibble(
+    tb_for_clustering %>% 
+      select(time) %>% 
+      separate_wider_delim(time, "_", names = c("mem", "time")),
+    
+    clus = km$cluster,
+    
+    dist = distance_centroid(km,      # see function below
+                             tb_for_clustering %>%
+                               select(-time))) %>% 
+  group_by(clus) %>% 
+  slice_min(dist, n = 800) %>% # closest 800 per cluster
+  ungroup()
+
+res %>%
+  write_csv("gcm_clusters_4_v2.csv")
 
 
-# save results
-tibble(
-  tb_for_clustering %>% 
-    select(1:2) %>% 
-    mutate(time = 
-             str_glue("{time}-01-01") %>% 
-             as_date() %>% 
-             {. + months(10)}),
+
+
+# PLOTS
+
+s_all_mem_norm %>% 
+  st_set_dimensions(3, values = tm_vector) %>% 
+  as_tibble() %>% 
+  separate_wider_delim(time, "_", names = c("mem", "time")) %>% 
+  left_join(res, by = c("time", "mem")) %>% 
+  group_by(time, mem, clus) %>% 
+  nest() %>% 
+  filter(clus == 3) %>% 
+  ungroup() %>% 
+  slice_sample(n = 1) %>% 
+  .$data %>% 
+  .[[1]] %>% 
+  ggplot(aes(x,y, fill = pr)) +
+  geom_raster() +
+  coord_equal() +
+  colorspace::scale_fill_continuous_divergingx(mid = 0.5, rev = T, na.value = "transparent")
+
+
+s_all_mem_norm %>% 
+  st_set_dimensions(3, values = tm_vector) %>% 
+  as_tibble() %>% 
+  separate_wider_delim(time, "_", names = c("mem", "time")) %>% 
+  left_join(res, by = c("time", "mem")) %>% 
+  group_by(clus, x, y) %>% 
+  summarise(pr = median(pr)) %>% 
+  drop_na() %>% 
+  ggplot(aes(x, y, fill = pr)) +
+  geom_raster() +
+  coord_equal() +
+  colorspace::scale_fill_continuous_divergingx(#mid = 0.5,
+                                               rev = T,
+                                               na.value = "transparent") +
+  facet_wrap(~clus)
   
-  clus = km$cluster
+
+
+# Predict to what cluster a new obs belongs
+
+x <- km
+r <- unname(unlist(tb_for_clustering[10, -1])) # a single row
+which.min(colSums((t(x$centers) - r)^2))
+
+predict_cluster <-
+  function(x, newdata) {
+    a <- apply(newdata, 1, function(r) which.min(colSums((t(x$centers) - r)^2)))
+    return(a)
+  }
+
+predict_cluster(km,
+                tb_for_clustering %>%
+                  filter(time == "r1i1p1f2_1940-10-16") %>%
+                  select(-time))
+
+
+
+# Determine distance from centroid
+
+distance_centroid <-
+  function(x, newdata) {
+    a <- apply(newdata, 1, function(r) min(colSums((t(x$centers) - r)^2)))
+    return(a)
+  }
+
+distance_centroid(km,
+                  tb_for_clustering %>%
+                    filter(time == "r1i1p1f2_1940-10-16") %>%
+                    select(-time))
+
+
+inner_join(
+  s_all_mem_norm %>% 
+    st_set_dimensions(3, values = tm_vector) %>% 
+    as_tibble() %>% 
+    separate_wider_delim(time, "_", names = c("mem", "time")),
   
-) %>% 
-  write_csv("gcm_clusters_4.csv")
+  res %>% 
+    mutate(dist = distance_centroid(km,
+                               tb_for_clustering %>%
+                                 select(-time)),
+            id = row_number()) %>% 
+    group_by(clus) %>% 
+    slice_min(dist, n = 800) %>%  # closest
+    ungroup(),
+  
+  by = c("mem", "time")
+  
+) %>%
+  group_by(clus, x, y) %>% 
+  summarise(pr = mean(pr)) %>% 
+  drop_na() %>% 
+  ggplot(aes(x, y, fill = pr)) +
+  geom_raster() +
+  coord_equal() +
+  colorspace::scale_fill_continuous_divergingx(#mid = 0.5,
+                                               rev = T,
+                                               na.value = "transparent") +
+  facet_wrap(~clus)
 
 
-
-
-# predict.kmeans <- 
-#   function(x, newdata) {
-#     a <- apply(newdata, 1, function(r) which.min(colSums((t(x$centers) - r)^2)))
-#     return(a)
-#   }
-# 
-# predict.kmeans(km,
-#                tb_for_clustering %>% 
-#                  filter(time == 1850,
-#                         mem == "r1i1p1f2") %>% 
-#                  select(-time, -mem))
-# 
-
-
-
-
-
-
-
-
-
-# tb_anom <-
-#   tb_pr_all_mem %>%
-#   group_by(lon, lat) %>%
-#   nest() %>%
-#   mutate(pr_std = map(data, function(df) {
-#     if (any(is.na(df$pr))) {
-#       rep(NA, nrow(df))
-#     } else {
-#       ecdf(df$pr)(df$pr)
-#     }
-#   })) %>%
-#   unnest(c(data, pr_std)) %>%
-#   ungroup() %>%
-#   
-#   na.omit() %>%
-#   group_by(time, mem) %>%
-#   mutate(gcell = row_number()) %>%
-#   ungroup()
 # 
 # 
-# tb_for_clustering <-
-#   tb_anom %>%
-#   select(gcell, pr_std, time, mem) %>%
-#   pivot_wider(names_from = gcell, names_prefix = "loc_", values_from = pr_std)
-# 
-# 
-# 
-# set.seed(111)
-# km <-
-#   kmeans(tb_for_clustering %>% select(-time, -mem),
-#          4,
-#          iter.max = 50)
-# 
-# bind_cols(tb_for_clustering %>%
-#             select(time, mem),
-#           cluster = km$cluster) %>%
-#   right_join(tb_anom, by = c("time", "mem")) -> tb_c
-# 
-# tb_c %>%
-#   group_by(cluster, lon, lat) %>%
-#   summarize(pr_std = mean(pr_std)) %>%
-#   ungroup() -> tb_d
-# 
-# tb_d %>%
-#   ggplot(aes(lon, lat, fill = pr_std)) +
-#   geom_raster() +
-#   coord_equal() +
-#   colorspace::scale_fill_continuous_divergingx(mid = 0.5, rev = T) +
-#   facet_wrap(~cluster)
-# 
-# km$cluster %>% table()
 
 
 

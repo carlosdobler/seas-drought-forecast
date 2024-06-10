@@ -1,4 +1,9 @@
 
+# EOF analysis of several regions with several 
+# variables to obtain the components' time series,
+# which will represent the model's predictors.
+
+
 
 library(tidyverse)
 library(stars)
@@ -7,29 +12,70 @@ library(furrr)
 options(future.fork.enable = T)
 plan(multicore)
 
+sf_use_s2(F)
 
-source("https://raw.github.com/carlosdobler/spatial-routines/master/cell_pos_and_import_subset.R")
 
 
-tb_extents <- 
+cmip_var_specs <- 
   bind_rows(
-    tibble(var = "tos", prov = "Omon", grid = "gr1", dom = "tp", xmin = 99, ymin = -47, xmax = 287, ymax = 28),
-    tibble(var = "tos", prov = "Omon", grid = "gr1", dom = "io", xmin = 44, ymin = -27, xmax = 104, ymax = 24),
-    tibble(var = "tos", prov = "Omon", grid = "gr1", dom = "ao", xmin = 336, ymin = -22, xmax = 13, ymax = 5),
+    tibble(var = "tos", 
+           prov = "Omon", 
+           grid = "gr1", 
+           regs = list(list(
+             tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
+             io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
+             sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
+             nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
+             np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60)))),
     
-    tibble(var = "zg", lev = 500, prov = "Amon", grid = "gr", dom = "io", xmin = 44, ymin = -27, xmax = 104, ymax = 24),
-    tibble(var = "zg", lev = 500, prov = "Amon", grid = "gr", dom = "ao", xmin = 336, ymin = -22, xmax = 13, ymax = 5),
-    tibble(var = "zg", lev = 500, prov = "Amon", grid = "gr", dom = "caf", xmin = 9, ymin = -19, xmax = 37, ymax = 12),
+    tibble(var = "zg", 
+           lev = list(c(200, 500, 850)), 
+           prov = "Amon", 
+           grid = "gr", 
+           regs = list(list(
+             tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
+             io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
+             sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
+             nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
+             np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60),
+             caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15)))),
     
-    tibble(var = "ua", lev = 200, prov = "Amon", grid = "gr", dom = "io", xmin = 44, ymin = -27, xmax = 104, ymax = 24),
-    tibble(var = "ua", lev = 200, prov = "Amon", grid = "gr", dom = "ao", xmin = 336, ymin = -22, xmax = 13, ymax = 5),
-    tibble(var = "ua", lev = 200, prov = "Amon", grid = "gr", dom = "caf", xmin = 9, ymin = -19, xmax = 37, ymax = 12),
+    tibble(var = "hus", 
+           lev = list(c(200, 850)), 
+           prov = "Amon", 
+           grid = "gr",
+           regs = list(list(
+             #tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
+             io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
+             sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
+             #nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
+             #np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60),
+             caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15)))),
     
-    tibble(var = "va", lev = 200, prov = "Amon", grid = "gr", dom = "io", xmin = 44, ymin = -27, xmax = 104, ymax = 24),
-    tibble(var = "va", lev = 200, prov = "Amon", grid = "gr", dom = "ao", xmin = 336, ymin = -22, xmax = 13, ymax = 5),
-    tibble(var = "va", lev = 200, prov = "Amon", grid = "gr", dom = "caf", xmin = 9, ymin = -19, xmax = 37, ymax = 12)
+    tibble(var = "ua", 
+           lev = list(c(200, 850)), 
+           prov = "Amon", 
+           grid = "gr",
+           regs = list(list(
+             #tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
+             io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
+             sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
+             #nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
+             #np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60),
+             caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15)))),
     
-    )
+    tibble(var = "va", 
+           lev = list(c(200, 850)), 
+           prov = "Amon", 
+           grid = "gr",
+           regs = list(list(
+             #tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
+             io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
+             sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
+             #nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
+             #np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60),
+             caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15))))
+  )
 
 
 gcm <- "CNRM-CERFACS/CNRM-CM6-1"
@@ -37,401 +83,349 @@ mems <- str_glue("r{seq(1,30,5)}i1p1f2")
 
 
 
+# Get time
 
-l <- vector("list", nrow(tb_extents))
-names(l) <- 
-  tb_extents %>% 
-  mutate(lev = if_else(is.na(lev), "", as.character(lev)),
-         v = str_glue("{var}{lev}")) %>% 
-  pull(v)
+tb_for_time_dims <- 
+  cmip_var_specs %>%
+  group_by(grid) %>% 
+  slice_head(n = 1)
+
+time_dims <- 
+  tb_for_time_dims %>% 
+  pmap(function(var, prov, grid, ...) {
+    
+    # root path
+    r <- 
+      str_glue("gcloud storage ls gs://cmip6/CMIP6/CMIP/{gcm}/historical/{mems[1]}/{prov}/{var}/{grid}/") %>% 
+      system(intern = T) %>% 
+      str_sub(start = 6, end = -2)
+    
+    dsn <- 
+      str_glue('ZARR:"/vsicurl/https://storage.googleapis.com/{r}"/:{var}.zarr/')
+    
+    
+    # format time
+    ret <-
+      gdal_utils("mdiminfo", dsn, quiet = TRUE)
+    
+    time_array <- 
+      jsonlite::fromJSON(ret)$arrays$time
+    
+    if (grid == "gr1") {
+      
+      time_vector <- 
+        str_glue('ZARR:"/vsicurl/https://storage.googleapis.com/{r}"/:/time') %>% 
+        read_stars() %>% 
+        pull() %>% 
+        as.vector() %>% 
+        {(. + 360) * 60 * 60} %>% # pcict works in seconds; 360 to ensure it to be mid month
+        PCICt::as.PCICt(cal = time_array$attributes$calendar,
+                        origin = time_array$attributes$time_origin)
+      
+    } else if (grid == "gr") {
+      
+      time_vector <- 
+        str_glue('ZARR:"/vsicurl/https://storage.googleapis.com/{r}"/:/time') %>% 
+        read_stars() %>% 
+        pull() %>% 
+        as.vector() %>% 
+        {. * 24 * 60 * 60} %>% # pcict works in seconds
+        PCICt::as.PCICt(cal = time_array$attributes$calendar,
+                        origin = time_array$attributes$time_origin)
+      
+    }
+    
+    time_i <- 
+      first(which(year(time_vector) == 1940))
+    
+    time_vector_sub <- 
+      time_vector %>% 
+      tail(-time_i+1) %>% 
+      str_sub(end = 8) %>% 
+      paste0("01") %>% 
+      as_date()
+    
+    return(list(time_i = time_i,
+                time_vector_sub = time_vector_sub))
+    
+  }) %>% 
+  set_names(tb_for_time_dims$grid)
 
 
-for (i in seq(nrow(tb_extents))) {
+
+
+# Prepare data
+
+reference_grid <-
+  st_bbox(c(xmin = 0, ymin = -90, xmax = 360, ymax = 90), crs = 4326) %>% 
+  st_as_stars(dx = 1.5, values = NA_real_)
+
+
+tb_pca <- 
   
-  print(str_glue("Loading var-domain {i} / {nrow(tb_extents)}"))
-  
-  # root path
-  r <- 
-    str_glue("gcloud storage ls gs://cmip6/CMIP6/CMIP/{gcm}/historical/{mems[1]}/{tb_extents$prov[i]}/{tb_extents$var[i]}/{tb_extents$grid[i]}/") %>% 
-    system(intern = T) %>% 
-    str_sub(start = 6, end = -2)
-  
-  dsn <- 
-    str_glue('ZARR:"/vsicurl/https://storage.googleapis.com/{r}"/:{tb_extents$var[i]}.zarr/')
-  
-  
-  # get time
-  ret = gdal_utils("mdiminfo", dsn, quiet = TRUE)
-  time_array <- jsonlite::fromJSON(ret)$arrays$time
-  
-  if (tb_extents$grid[i] == "gr1") {
+  pmap_dfc(cmip_var_specs, function(var, prov, grid, lev, regs) {
     
-    time_vector <- 
-      str_glue('ZARR:"/vsicurl/https://storage.googleapis.com/{r}"/:/time') %>% 
-      read_stars() %>% 
-      pull() %>% 
-      as.vector() %>% 
-      {(. + 360) * 60 * 60} %>% # pcict works in seconds; 360 for it to be mid month
-      PCICt::as.PCICt(cal = time_array$attributes$calendar,
-                      origin = time_array$attributes$time_origin)
+    # var = cmip_var_specs$var[1]
+    # prov = cmip_var_specs$prov[1]
+    # grid = cmip_var_specs$grid[1]
+    # lev = cmip_var_specs$lev[1]
+    # regs = cmip_var_specs$regs[1]
     
-  } else if (tb_extents$grid[i] == "gr") {
+    time_dim <- time_dims %>% pluck(grid)
     
-    time_vector <- 
-      str_glue('ZARR:"/vsicurl/https://storage.googleapis.com/{r}"/:/time') %>% 
-      read_stars() %>% 
-      pull() %>% 
-      as.vector() %>% 
-      {. * 24 * 60 * 60} %>% # pcict works in seconds
-      PCICt::as.PCICt(cal = time_array$attributes$calendar,
-                      origin = time_array$attributes$time_origin)
+    print(str_glue("Processing var {var}"))
     
-  }
-  
-  time_i <- first(which(year(time_vector) == 1940))
-  
-  
-  
-  # get spatial extents
-  if (is.na(tb_extents$lev[i])) {
-    
-    s_proxy <- 
-      read_mdim(dsn,
-                count = c(NA,NA,1)) %>% 
-      adrop()
-    
-  } else {
-    
-    s_proxy <- 
-      read_mdim(dsn,
-                count = c(NA,NA,1,1)) %>% 
-      adrop()
-    
-    # get levels
-    plev_vector <- 
-      str_glue('ZARR:"/vsicurl/https://storage.googleapis.com/{r}"/:/plev') %>% 
-      read_stars() %>% 
-      pull() %>% 
-      as.vector() %>% 
-      {./100}
-    
-  }
-  
-  
-  off_x <- fn_get_cell_pos(s_proxy, 1, tb_extents$xmin[i])
-  count_x <- fn_get_cell_pos(s_proxy, 1, tb_extents$xmax[i]) - off_x
-  off_y <- fn_get_cell_pos(s_proxy, 2, tb_extents$ymin[i])
-  count_y <- fn_get_cell_pos(s_proxy, 2, tb_extents$ymax[i]) - off_y
-  
-  
-  # load data
-  
-  ll <- 
-    future_map(set_names(mems), function(mem) {
-      
-      # print(str_glue("   member: {mem}"))
-      
-      r <- 
-        str_glue("gcloud storage ls gs://cmip6/CMIP6/CMIP/{gcm}/historical/{mem}/{tb_extents$prov[i]}/{tb_extents$var[i]}/{tb_extents$grid[i]}/") %>% 
-        system(intern = T) %>% 
-        str_sub(start = 6, end = -2)
-      
-      dsn <- 
-        str_glue('ZARR:"/vsicurl/https://storage.googleapis.com/{r}"/:{tb_extents$var[i]}.zarr/')
-      
-      
-      if (count_x > 0) {
+    s_anoms <-
+      map(mems %>% set_names(), function(mem){
         
-        if (is.na(tb_extents$lev[i])) {
+        print(str_glue("   member {mem}"))
+        
+        r <- 
+          str_glue("gcloud storage ls gs://cmip6/CMIP6/CMIP/{gcm}/historical/{mem}/{prov}/{var}/{grid}/") %>% 
+          system(intern = T) %>% 
+          str_sub(start = 6, end = -2)
+        
+        dsn <- 
+          str_glue('ZARR:"/vsicurl/https://storage.googleapis.com/{r}"/:{var}.zarr/')
+        
+        
+        # load zarr file
+        if (is.null(unlist(lev))) {
           
           s <- 
             read_mdim(dsn, 
-                      offset = c(off_x, off_y, time_i-1), 
-                      count = c(count_x, count_y, NA))
+                      offset = c(0, 0, time_dim$time_i-1)) %>% 
+            st_warp(reference_grid)
           
-        } else {
+          
+        } else { # variable has plevels
+          
           
           s <-
             read_mdim(dsn, 
-                      offset = c(off_x, 
-                                 off_y,
-                                 which(plev_vector == tb_extents$lev[i])-1,
-                                 time_i-1),
-                      
-                      count = c(count_x, 
-                                count_y,
-                                1,
-                                NA)) %>% 
-            adrop()
-          
-        }
-        
-      } else {
-        
-        if (is.na(tb_extents$lev[i])) {
-          
-          s1 <- 
-            read_mdim(dsn, 
-                      offset = c(off_x, off_y, time_i-1), 
-                      count = c(NA, count_y, NA)) %>% 
-            st_set_dimensions(1, 
-                              values = st_get_dimension_values(., 1, where = "start") - 360)
-          
-          s2 <- 
-            read_mdim(dsn,
-                      offset = c(0, off_y, time_i-1),
-                      count = c(fn_get_cell_pos(s_proxy, 1, tb_extents$xmax[i]),
-                                count_y,
-                                NA))
-        
-          s <- 
-            c(s1,s2, along = 1) %>% 
+                      offset = c(0,0,0, time_dim$time_i-1)) %>% 
+            st_set_dimensions(2,
+                              values = seq(st_get_dimension_values(., 2, where = "start") %>% first(),
+                                           st_get_dimension_values(., 2, where = "start") %>% last(),
+                                           length.out = dim(.)[2])) %>%
             st_set_crs(4326)
           
-            
-        } else {
+          plev_val <- st_get_dimension_values(s, "plev")/100
           
-          s1 <- 
-            read_mdim(dsn, 
-                      offset = c(off_x, 
-                                 off_y, 
-                                 which(plev_vector == tb_extents$lev[i])-1,
-                                 time_i-1),
-                      
-                      count = c(NA, 
-                                count_y, 
-                                1,
-                                NA)) %>% 
-            
-            st_set_dimensions(1, 
-                              values = st_get_dimension_values(., 1, where = "start") - 360)
-          
-          s2 <- 
-            read_mdim(dsn,
-                      offset = c(0, 
-                                 off_y, 
-                                 which(plev_vector == tb_extents$lev[i])-1,
-                                 time_i-1),
-                      
-                      count = c(fn_get_cell_pos(s_proxy, 1, tb_extents$xmax[i]),
-                                count_y,
-                                1,
-                                NA))
+          plev_pos <- which(plev_val %in% unlist(lev))
           
           s <- 
-            c(s1,s2, along = 1) %>% 
-            st_set_crs(4326) %>% 
-            adrop()
+            s %>% 
+            slice(plev, plev_pos)
+          
+          s <- 
+            s %>% 
+            st_warp(reference_grid)
           
         }
         
-      }
-      
-      
-      if (tb_extents$grid[i] == "gr") {
         
-        # reg dimension
-        s <- 
-          s %>%
-          st_set_dimensions(2, 
-                            values = seq(st_get_dimension_values(s, 2, where = "start") %>% first(),
-                                         st_get_dimension_values(s, 2, where = "start") %>% last(),
-                                         length.out = dim(s)[2])) %>%
-          st_set_crs(4326)
         
-      }
-      
-      return(s)
-      
-    })
-  
-  l[[i]] <- ll
-  
-}
-
-
-
-
-
-# anomalies
-
-ss_anom <- 
-  
-  l %>% 
-  map(function(ss) {
-    
-    s <-
-      do.call(c, c(ss, along = "time"))
-
-    s_anom <-
-      s %>%
-      st_apply(c(1,2), function(x) {
-
-        if(all(is.na(x))) {
-          rep(NA, length(x))
-        } else {
-
-          m <- matrix(x, ncol = 12, byrow = T)
-          mm <- apply(m, 2, mean, na.rm = T)
-          as.vector(t(x-mm))
-
+        # crop regions
+        s_regs <- 
+          regs %>% #unlist(recursive = F) %>% 
+          map(function(reg) {
+            
+            if (reg["xmin"] > 180 & reg["xmax"] < 180){
+              
+              reg1 <- reg
+              reg1["xmax"] <- 359.5
+              
+              s1 <- 
+                st_crop(s, st_bbox(reg1, crs = 4326)) %>% 
+                suppressMessages() %>% 
+                st_set_dimensions(1, 
+                                  values = st_get_dimension_values(., 1, where = "start") - 360)
+              
+              reg2 <- reg
+              reg2["xmin"] <- 0.5
+              
+              s2 <- 
+                st_crop(s, st_bbox(reg2, crs = 4326)) %>% 
+                suppressMessages()
+              
+              c(s1,s2, along = 1) %>%
+                st_set_crs(4326)
+              
+              
+            } else {
+              
+              s %>% 
+                st_crop(st_bbox(reg, crs = 4326)) %>% 
+                suppressMessages()
+              
+            }
+            
+          })
+        
+        
+        # split plev
+        if (s_regs[[1]] %>% dim() %>% length() > 3) {
+          
+          s_regs <- 
+            s_regs %>% 
+            map(function(s_r) {
+              
+              plev_val <- st_get_dimension_values(s_r, "plev")/100
+              
+              seq_len(dim(s_r)[3]) %>% 
+                map(function(pp) {
+                  
+                  s_r %>% 
+                    slice(plev, pp) %>% 
+                    setNames(str_glue("{var}{plev_val[pp]}"))
+                  
+                })
+              
+            }) %>% 
+            unlist(recursive = F)
+          
         }
-
-      },
-      .fname = "time",
-      FUTURE = F) %>%
-      aperm(c(2,3,1))
-
-    return(s_anom)
+        
+        
+        
+        # anomalies
+        
+        s_anoms <- 
+          
+          s_regs %>% 
+          map(function(s) {
+            
+            s %>%
+              st_apply(c(1,2), function(x) {
+                
+                if(all(is.na(x))) {
+                  rep(NA, length(x))
+                } else {
+                  
+                  m <- matrix(x, ncol = 12, byrow = T)
+                  mm <- apply(m, 2, mean, na.rm = T)
+                  as.vector(t(x-mm))
+                  
+                }
+                
+              },
+              .fname = "time",
+              FUTURE = F) %>%
+              aperm(c(2,3,1))
+            
+          })
+        
+        return(s_anoms)
+        
+      })
     
-    # ss %>%
-    #   map(function(s) {
-    # 
-    #     s %>%
-    #       st_apply(c(1,2), function(x) {
-    # 
-    #         if(all(is.na(x))) {
-    #           rep(NA, length(x))
-    #         } else {
-    # 
-    #           m <- matrix(x, ncol = 12, byrow = T)
-    #           mm <- apply(m, 2, mean, na.rm = T)
-    #           as.vector(t(x-mm))
-    # 
-    #         }
-    # 
-    #       },
-    #       .fname = "time",
-    #       FUTURE = F) %>%
-    #       aperm(c(2,3,1))
-    # 
-    # 
-    #   }) %>%
-    # 
-    #   {do.call(c, c(., along = "time"))}
     
-  })
+    print(str_glue(" Calculating PCAs"))
+    
+    tb_var <- 
+      s_anoms %>% 
+      transpose() %>% 
+      imap_dfc(function(ss, i){
+        
+        tb <- 
+          ss %>%
+          map(st_set_dimensions, 3, values = time_dims$gr$time_vector_sub) %>% 
+          map(as_tibble) %>% 
+          imap(~mutate(.x, 
+                       member = .y)) %>%
+          map(rename, "value" = 4) %>% 
+          bind_rows()
+        
+        tb_for_pca <- 
+          tb %>% 
+          mutate(tm = str_glue("{member}_{time}")) %>% 
+          drop_na() %>% 
+          group_by(tm) %>% 
+          mutate(gcell = row_number()) %>%
+          ungroup() %>%
+          select(tm, value, gcell) %>% 
+          pivot_wider(names_from = "gcell", names_prefix = "g_", values_from = value) %>% 
+          select(where(~!any(is.na(.))))
+        
+        
+        pca <- 
+          tb_for_pca %>% 
+          select(-1) %>% 
+          apply(1, scale, scale = F) %>%
+          aperm(c(2,1)) %>%
+          
+          prcomp(scale. = T,
+                 center = F)
+        
+        
+        {
+          #   # plot (spatial)
+          #   pca$rotation[,"PC1"] %>%
+          #     as_tibble() %>%
+          #     bind_cols(
+          #       tb %>%
+          #         filter(time == "1940-01-01", member == "r1i1p1f2") %>%
+          #         drop_na() %>%
+          #         select(1:2)
+          #     ) %>%
+          #     ggplot(aes(x, y, fill = value)) +
+          #     geom_raster() +
+          #     scale_fill_gradient2() +
+          #     coord_equal()
+          # 
+          # 
+          #   # plot (temporal)
+          #   pca$x[, "PC1"] %>%
+          #     as_tibble() %>%
+          #     mutate(time = tb_for_pca$tm) %>%
+          #     separate_wider_delim(time, "_", names = c("mem", "time")) %>%
+          #     mutate(time = as_date(time)) %>%
+          # 
+          #     filter(mem == "r7i1p1f2") %>%
+          # 
+          #     ggplot(aes(time, value)) +
+          #     geom_line() +
+          #     scale_x_date(date_breaks = "5 years",
+          #                  date_labels = "%Y",
+          #                  ) +
+          #     geom_hline(yintercept = 0, linetype = "2222")
+          }
+        
+        bind_cols(pca$x[,1:5] %>% 
+                    as_tibble() %>% 
+                    set_names(str_glue("{str_extract(i, '[a-z]+')}_{names(ss[[1]])}_eof{seq(1,5)}")))
+        
+      })
+    
+    return(tb_var)
+    
+  }) 
 
 
 
 
-# pca
+# Assemble table
 
-tb_time_mem <- 
+tm_vector <- 
   
   tidyr::expand_grid(
-    
     mem = 
       mems,
-    
-    time = 
-      l[[1]][[1]] %>% 
-      st_get_dimension_values("time") %>% 
-      str_sub(end = 7)
-    
-  )
-
-time_mem_vector <- 
-  tb_time_mem %>% 
-  mutate(tm = str_glue("{mem}_{time}")) %>% 
-  pull(tm)
-
-
-
-tbs <- 
-  pmap(list(ss_anom, names(ss_anom), tb_extents$dom), function(s, var, dom){
-    
-    # s = ss_anom[[3]]
-    
-    tb_anom <- 
-      s %>% 
-      st_set_dimensions("time", 
-                        values = time_mem_vector) %>% 
-      as_tibble() %>% 
-      na.omit()
-    
-    tb_anom <- 
-      tb_anom %>% 
-      mutate(time = as.character(time)) %>% # from factor
-      rename("v" = 4)
-    
-    tb_for_pca <- 
-      tb_anom %>%
-      group_by(time) %>% 
-      mutate(gcell = row_number()) %>% 
-      ungroup() %>%
-      select(time, v, gcell) %>% 
-      pivot_wider(names_from = "gcell", names_prefix = "g_", values_from = v)
-    
-    pca <- 
-      tb_for_pca %>% 
-      select(-1) %>% 
-      
-      apply(1, scale, scale = F) %>%
-      aperm(c(2,1)) %>%
-      
-      prcomp(scale. = T, # T
-             center = F) # virtually no diff
-    
-    
-    # # plot (spatial)
-    # pca$rotation[,"PC3"] %>%
-    #   as_tibble() %>%
-    #   bind_cols(
-    #     s %>%
-    #       slice(time, 3) %>%
-    #       as_tibble() %>%
-    #       na.omit() %>%
-    #       select(1:2)
-    #   ) %>%
-    #   ggplot(aes(lon, lat, fill = value)) +
-    #   geom_raster() +
-    #   scale_fill_gradient2() +
-    #   coord_equal()
-    # 
-    # 
-    # # plot (temporal)
-    # pca$x[, "PC1"] %>%
-    #   as_tibble() %>%
-    #   mutate(time = time_mem_vector) %>%
-    #   separate_wider_delim(time, "_", names = c("mem", "time")) %>%
-    #   mutate(time = as_date(str_glue("{time}-01"))) %>%
-    # 
-    #   filter(mem == "r1i1p1f2") %>%
-    # 
-    #   ggplot(aes(time, value)) +
-    #   geom_line() +
-    #   # scale_y_reverse() +
-    #   scale_x_date(date_breaks = "5 years",
-    #                date_labels = "%Y",
-    #                ) +
-    #   geom_hline(yintercept = 0, linetype = "2222")
-    
-    
-    
-    
-    # final table
-    
-    tb <- 
-      tibble(time = time_mem_vector) %>% 
-      separate_wider_delim(time, "_", names = c("mem", "time")) %>% 
-      mutate(time = as_date(str_glue("{time}-01"))) %>% 
-      bind_cols(pca$x[,1:5] %>% 
-                  as_tibble() %>% 
-                  set_names(str_glue("{dom}_{var}_{seq(1,5)}")))
-    
-    
-    return(tb)
-    
-  })
-
-
-bind_cols(
-  tbs[[1]],
-  tbs[-1] %>% 
-    map(select, -c(1:2))
-) %>% 
+    time = time_dims$gr$time_vector_sub
+  ) %>% 
   
-  write_csv("gcm_tb_eof.csv")
+  mutate(tm = str_glue("{mem}_{time}")) %>% 
+  select(tm)
+
+
+tb_f <- 
+  tm_vector %>% 
+  separate_wider_delim(tm, "_", names = c("mem", "time")) %>%
+  mutate(time = as_date(time)) %>% 
+  bind_cols(tb_pca)
+
+write_csv(tb_f, "experiment_01/data/gcm_tb_eof_v2.csv")
+
 
 

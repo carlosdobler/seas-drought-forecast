@@ -1,4 +1,8 @@
 
+# Script to conduct EOF analysis of several regions with several 
+# variables and extract the components' time series
+
+
 library(tidyverse)
 library(stars)
 library(furrr)
@@ -15,60 +19,56 @@ cmip_var_specs <-
     tibble(var = "tos", 
            prov = "Omon", 
            grid = "gr1", 
-           regs = list(list(tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
-                            io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
-                            sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
-                            nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
-                            np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60)))),
+           regs = list(list(
+             tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
+             io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
+             sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
+             nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
+             np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60)))),
     
     tibble(var = "zg", 
            lev = list(c(200, 500, 850)), 
            prov = "Amon", 
            grid = "gr", 
-           regs = list(list(tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
-                            io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
-                            sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
-                            nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
-                            np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60),
-                            caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15)))),
+           regs = list(list(
+             tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
+             io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
+             sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
+             nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
+             np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60),
+             caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15)))),
     
     tibble(var = "hus", 
            lev = list(c(200, 850)), 
            prov = "Amon", 
            grid = "gr",
-           regs = list(list(#tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
-                            io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
-                            sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
-                            #nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
-                            #np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60),
-                            caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15)))),
+           regs = list(list(
+             io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
+             sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
+             caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15)))),
     
     tibble(var = "ua", 
            lev = list(c(200, 850)), 
            prov = "Amon", 
            grid = "gr",
-           regs = list(list(#tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
-                            io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
-                            sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
-                            #nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
-                            #np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60),
-                            caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15)))),
+           regs = list(list(
+             io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
+             sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
+             caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15)))),
     
     tibble(var = "va", 
            lev = list(c(200, 850)), 
            prov = "Amon", 
            grid = "gr",
-           regs = list(list(#tp = c(xmin = 125, ymin = -47, xmax = 287, ymax = 30),
-                            io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
-                            sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
-                            #nao = c(xmin = 290, ymin = 24, xmax = 350, ymax = 65),
-                            #np = c(xmin = 135, ymin = 20, xmax = 237, ymax = 60),
-                            caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15))))
+           regs = list(list(
+             io = c(xmin = 40, ymin = -40, xmax = 110, ymax = 20),
+             sao = c(xmin = 315, ymin = -39, xmax = 13, ymax = 13),
+             caf = c(xmin = 4, ymin = -21, xmax = 42, ymax = 15))))
   )
 
 
 gcm <- "CNRM-CERFACS/CNRM-CM6-1"
-mems <- str_glue("r{seq(1,30,5)}i1p1f2") %>% head(5)
+mems <- str_glue("r{seq(1,30,5)}i1p1f2")
 
 
 
@@ -141,6 +141,16 @@ time_dims <-
   set_names(tb_for_time_dims$grid)
 
 
+tm_vector <- 
+  tidyr::expand_grid(
+    mem = 
+      mems,
+    time = time_dims$gr$time_vector_sub
+  ) %>%
+  mutate(tm = str_glue("{mem}_{time}")) %>% 
+  pull(tm)
+
+
 
 
 # Prepare data
@@ -150,25 +160,44 @@ reference_grid <-
   st_as_stars(dx = 1.5, values = NA_real_)
   
 
+tm_vector <- 
+  tidyr::expand_grid(
+    mem = 
+      mems,
+    time = time_dims$gr$time_vector_sub
+  ) %>%
+  mutate(tm = str_glue("{mem}_{time}")) %>% 
+  pull(tm)
+
+
+
+
+# Prepare data
+
+reference_grid <-
+  st_bbox(c(xmin = 0, ymin = -90, xmax = 360, ymax = 90), crs = 4326) %>% 
+  st_as_stars(dx = 1.5, values = NA_real_)
+
+
 tb_pca <- 
   
   pmap_dfc(cmip_var_specs, function(var, prov, grid, lev, regs) {
     
-    # var = cmip_var_specs$var[1]
-    # prov = cmip_var_specs$prov[1]
-    # grid = cmip_var_specs$grid[1]
-    # lev = cmip_var_specs$lev[1]
-    # regs = cmip_var_specs$regs[1]
+    # var = cmip_var_specs$var[4]
+    # prov = cmip_var_specs$prov[4]
+    # grid = cmip_var_specs$grid[4]
+    # lev = cmip_var_specs$lev[4]
+    # regs = cmip_var_specs$regs[4]
     
     time_dim <- time_dims %>% pluck(grid)
     
     print(str_glue("Processing var {var}"))
-  
-    s_anoms <-
-      map(mems %>% set_names(), function(mem){
     
+    ss <-
+      map(mems %>% set_names(), function(mem){
+        
         print(str_glue("   member {mem}"))
-
+        
         r <- 
           str_glue("gcloud storage ls gs://cmip6/CMIP6/CMIP/{gcm}/historical/{mem}/{prov}/{var}/{grid}/") %>% 
           system(intern = T) %>% 
@@ -178,26 +207,54 @@ tb_pca <-
           str_glue('ZARR:"/vsicurl/https://storage.googleapis.com/{r}"/:{var}.zarr/')
         
         
-        # load zarr file
+        
         if (is.null(unlist(lev))) {
           
+          # load zarr file
           s <- 
             read_mdim(dsn, 
-                      offset = c(0, 0, time_dim$time_i-1)) %>% 
+                      offset = c(0, 0, time_dim$time_i-1))
+          
+          
+          # irregular lat?
+          if(st_get_dimension_values(s, 2) %>% diff() %>% unique() %>% length() %>% {. > 1}) {
+            
+            s <- 
+              s %>% 
+              st_set_dimensions(2,
+                                values = seq(st_get_dimension_values(., 2, where = "start") %>% first(),
+                                             st_get_dimension_values(., 2, where = "start") %>% last(),
+                                             length.out = dim(.)[2])) %>%
+              st_set_crs(4326)
+            
+          }
+          
+          s <- 
+            s %>%
             st_warp(reference_grid)
           
           
         } else { # variable has plevels
           
-          
-          s <-
+          # load zarr file
+          s <- 
             read_mdim(dsn, 
-                      offset = c(0,0,0, time_dim$time_i-1)) %>% 
-            st_set_dimensions(2,
-                              values = seq(st_get_dimension_values(., 2, where = "start") %>% first(),
-                                           st_get_dimension_values(., 2, where = "start") %>% last(),
-                                           length.out = dim(.)[2])) %>%
-            st_set_crs(4326)
+                      offset = c(0, 0, 0, time_dim$time_i-1))
+          
+          
+          # irregular lat?
+          if(st_get_dimension_values(s, 2) %>% diff() %>% unique() %>% length() %>% {. > 1}) {
+            
+            s <- 
+              s %>% 
+              st_set_dimensions(2,
+                                values = seq(st_get_dimension_values(., 2, where = "start") %>% first(),
+                                             st_get_dimension_values(., 2, where = "start") %>% last(),
+                                             length.out = dim(.)[2])) %>%
+              st_set_crs(4326)
+            
+          }
+          
           
           plev_val <- st_get_dimension_values(s, "plev")/100
           
@@ -217,7 +274,7 @@ tb_pca <-
         
         # crop regions
         s_regs <- 
-          regs %>% #unlist(recursive = F) %>% 
+          regs %>% unlist(recursive = F) %>% 
           map(function(reg) {
             
             if (reg["xmin"] > 180 & reg["xmax"] < 180){
@@ -277,140 +334,194 @@ tb_pca <-
         }
         
         
+        # rolling means
+        # s_regs_roll <-
+        #   s_regs %>%
+        #   map(function(s_reg){
+        # 
+        #     s_reg %>%
+        #       st_apply(c(1,2), function(x) {
+        # 
+        #         if(all(is.na(x))) {
+        #           rep(NA, length(x))
+        #         } else {
+        # 
+        #           zoo::rollmean(x, 3, fill = NA, align = "right")
+        # 
+        #         }
+        # 
+        #       },
+        #       .fname = "time") %>%
+        #       aperm(c(2,3,1))
+        # 
+        #   })
+        # 
+        # return(s_regs_roll)
         
-        # anomalies
+        return(s_regs)
         
-        s_anoms <- 
-          
-          s_regs %>% 
-          map(function(s) {
-            
-            s %>%
-              st_apply(c(1,2), function(x) {
-                
-                if(all(is.na(x))) {
-                  rep(NA, length(x))
-                } else {
-                  
-                  m <- matrix(x, ncol = 12, byrow = T)
-                  mm <- apply(m, 2, mean, na.rm = T)
-                  as.vector(t(x-mm))
-                  
-                }
-                
-              },
-              .fname = "time",
-              FUTURE = F) %>%
-              aperm(c(2,3,1))
-            
-          })
         
-        return(s_anoms)
-
       })
-      
+    
     
     print(str_glue(" Calculating PCAs"))
     
     tb_var <- 
-      s_anoms %>% 
-      transpose() %>% 
-      imap_dfc(function(ss, i){
+      ss %>% 
+      transpose() %>% # members 2nd level; regions 1st level
+      imap_dfc(function(ssr, i){
+        
+        print(str_glue("   {names(ssr[[1]])} {str_extract(i, '[a-z]+')}"))
+        
+        # anomalies
+        s_anom <- 
+          ssr %>% 
+          {do.call(c, c(., along = 3))} %>% 
+          
+          st_apply(c(1,2), function(x){
+            
+            if(all(is.na(x))) {
+              rep(NA, length(x))
+            } else {
+              
+              mm <- 
+                x %>% 
+                matrix(ncol = 12, byrow = T) %>% 
+                apply(2, mean, na.rm = T)
+              
+              x-mm
+              
+            }
+            
+          },
+          .fname = "time",
+          FUTURE = F) %>%
+          aperm(c(2,3,1))
+        
+        
+        # pca prep
         
         tb <- 
-          ss %>%
-          map(st_set_dimensions, 3, values = time_dims$gr$time_vector_sub) %>% 
-          map(as_tibble) %>% 
-          imap(~mutate(.x, 
-                       member = .y)) %>%
-          map(rename, "value" = 4) %>% 
-          bind_rows()
+          s_anom %>%
+          st_set_dimensions(3, values = tm_vector) %>% 
+          as_tibble() %>% 
+          mutate(time = as.character(time)) %>% 
+          rename("value" = 4)
         
         tb_for_pca <- 
           tb %>% 
-          mutate(tm = str_glue("{member}_{time}")) %>% 
-          drop_na() %>% 
-          group_by(tm) %>% 
+          drop_na() %>%
+          group_by(time) %>% 
           mutate(gcell = row_number()) %>%
           ungroup() %>%
-          select(tm, value, gcell) %>% 
-          pivot_wider(names_from = "gcell", names_prefix = "g_", values_from = value) %>% 
-          select(where(~!any(is.na(.))))
-        
+          select(time, value, gcell) %>% 
+          pivot_wider(names_from = "gcell", names_prefix = "g_", values_from = value) #%>%
+          
+        empty_gcells <- 
+          tb_for_pca %>% 
+          select(where(~any(is.na(.)))) %>% 
+          names() %>% 
+          str_sub(3)
         
         pca <- 
           tb_for_pca %>% 
+          select(where(~!any(is.na(.)))) %>% 
           select(-1) %>% 
           apply(1, scale, scale = F) %>%
           aperm(c(2,1)) %>%
-          
-          prcomp(scale. = T,
-                 center = F)
-        
+          prcomp(scale. = F)
         
         {
-        #   # plot (spatial)
-        #   pca$rotation[,"PC1"] %>%
-        #     as_tibble() %>%
-        #     bind_cols(
-        #       tb %>%
-        #         filter(time == "1940-01-01", member == "r1i1p1f2") %>%
-        #         drop_na() %>%
-        #         select(1:2)
-        #     ) %>%
-        #     ggplot(aes(x, y, fill = value)) +
-        #     geom_raster() +
-        #     scale_fill_gradient2() +
-        #     coord_equal()
-        # 
-        # 
-        #   # plot (temporal)
-        #   pca$x[, "PC1"] %>%
-        #     as_tibble() %>%
-        #     mutate(time = tb_for_pca$tm) %>%
-        #     separate_wider_delim(time, "_", names = c("mem", "time")) %>%
-        #     mutate(time = as_date(time)) %>%
-        # 
-        #     filter(mem == "r7i1p1f2") %>%
-        # 
-        #     ggplot(aes(time, value)) +
-        #     geom_line() +
-        #     scale_x_date(date_breaks = "5 years",
-        #                  date_labels = "%Y",
-        #                  ) +
-        #     geom_hline(yintercept = 0, linetype = "2222")
+          # plot (spatial)
+          pca$rotation[,"PC3"] %>%
+            as_tibble() %>%
+            bind_cols(
+              tb %>%
+                filter(time == "r1i1p1f2_1941-01-01") %>%
+                drop_na() %>%
+                mutate(gcell = row_number()) %>% 
+                filter(!gcell %in% empty_gcells) %>% 
+                select(1:2)
+            ) %>%
+            ggplot(aes(x, y, fill = value)) +
+            geom_raster() +
+            scale_fill_gradient2() +
+            coord_equal()
+
+
+          # plot (temporal)
+          pca$x[, "PC1"] %>%
+            as_tibble() %>%
+            mutate(time = tb_for_pca$time) %>%
+            separate_wider_delim(time, "_", names = c("mem", "time")) %>%
+            mutate(time = as_date(time)) %>%
+
+            filter(mem == "r1i1p1f2") %>%
+            # filter(month(time) == 11) %>%
+
+            ggplot(aes(time, value)) +
+            geom_line() +
+            scale_x_date(date_breaks = "5 years",
+                         date_labels = "%Y",
+                         ) +
+            scale_y_reverse() +
+            geom_hline(yintercept = 0, linetype = "2222")
+
+
+          # # composite (high)
+          pca$x[, "PC1"] %>%
+            as_tibble() %>%
+            mutate(time = tm_vector) %>%
+            slice_max(value, n = 20) %>%
+            select(-value) %>%
+            left_join(tb, by = "time") %>%
+            separate_wider_delim(time, "_", names = c("member", "time")) %>%
+            mutate(time = as_date(time)) %>%
+            ggplot(aes(x, y, fill = value)) +
+            geom_raster() +
+            colorspace::scale_fill_continuous_diverging(rev = T, na.value = "transparent") +
+            facet_wrap(~time, ncol = 5)
+
+          # composite (low)
+          pca$x[, "PC1"] %>%
+            as_tibble() %>%
+            mutate(time = tm_vector) %>%
+            slice_min(value, n = 20) %>%
+            select(-value) %>%
+            left_join(tb, by = "time") %>%
+            separate_wider_delim(time, "_", names = c("member", "time")) %>%
+            mutate(time = as_date(time)) %>%
+            ggplot(aes(x, y, fill = value)) +
+            geom_raster() +
+            colorspace::scale_fill_continuous_diverging(rev = T, na.value = "transparent") +
+            facet_wrap(~time, ncol = 5)
+          
           }
         
-        bind_cols(pca$x[,1:5] %>% 
+        n_comps <- 3
+        
+        bind_cols(pca$x[,1:n_comps] %>% 
                     as_tibble() %>% 
-                    set_names(str_glue("{str_extract(i, '[a-z]+')}_{names(ss[[1]])}_eof{seq(1,5)}")))
+                    mutate(across(everything(), \(x) as.vector(scale(x, center = F)))) %>% 
+                    set_names(str_glue("{names(ssr[[1]])}_{str_extract(i, '[a-z]+')}_eof{seq(1,n_comps)}")))
         
       })
     
     return(tb_var)
     
-  }) 
+  })
 
 
-tm_vector <- 
-  
-  tidyr::expand_grid(
-    mem = 
-      mems,
-    time = time_dims$gr$time_vector_sub
-  ) %>% 
-  
-  mutate(tm = str_glue("{mem}_{time}")) %>% 
-  select(tm)
 
+# Assemble table
 
 tb_f <- 
-  tm_vector %>% 
+  tibble(tm = tm_vector) %>% 
   separate_wider_delim(tm, "_", names = c("mem", "time")) %>%
   mutate(time = as_date(time)) %>% 
   bind_cols(tb_pca)
 
-write_csv(tb_f, "experiment_03/predictors_gcm.csv")
+write_csv(tb_f, "experiment_03/data/predictors_gcm.csv")
 
     
     
